@@ -162,10 +162,10 @@ jobs:
           else
             notes="Open Design Antigravity ${VERSION} for macOS Apple Silicon (arm64).
 
-Private source tag: ${SOURCE_TAG}
-Source commit: ${SOURCE_COMMIT}
+            Private source tag: ${SOURCE_TAG}
+            Source commit: ${SOURCE_COMMIT}
 
-Unsigned build for local installation. Verify it with the published SHA-256 file."
+            Unsigned build for local installation. Verify it with the published SHA-256 file."
 
             gh release create "$RELEASE_TAG" "${assets[@]}" \
               --repo "$GITHUB_REPOSITORY" \
