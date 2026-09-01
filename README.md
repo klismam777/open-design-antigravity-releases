@@ -13,7 +13,7 @@ Este repositório não contém o código-fonte do produto nem dados de usuários
 
 O aplicativo consulta:
 
-`https://github.com/gotaevo/open-design-antigravity-releases/releases/latest/download/metadata.json`
+`https://github.com/klismam777/open-design-antigravity-releases/releases/latest/download/metadata.json`
 
 Tags de origem aceitas seguem o formato `antigravity-vX.Y.Z`. O workflow publica a versão correspondente como `vX.Y.Z` neste repositório.
 

@@ -9,7 +9,7 @@ describe("fork updater metadata", () => {
       artifactName: "open-design-antigravity-0.15.2-win-x64-setup.exe",
       artifactSize: 321_654_987,
       generatedAt: "2026-07-16T20:00:00.000Z",
-      repository: "gotaevo/open-design-antigravity-releases",
+      repository: "klismam777/open-design-antigravity-releases",
       sourceTag: "antigravity-v0.15.2",
     });
 
@@ -26,10 +26,10 @@ describe("fork updater metadata", () => {
           contentType: "application/vnd.microsoft.portable-executable",
           name: "open-design-antigravity-0.15.2-win-x64-setup.exe",
           sha256Url:
-            "https://github.com/gotaevo/open-design-antigravity-releases/releases/download/v0.15.2/open-design-antigravity-0.15.2-win-x64-setup.exe.sha256",
+            "https://github.com/klismam777/open-design-antigravity-releases/releases/download/v0.15.2/open-design-antigravity-0.15.2-win-x64-setup.exe.sha256",
           size: 321_654_987,
           url:
-            "https://github.com/gotaevo/open-design-antigravity-releases/releases/download/v0.15.2/open-design-antigravity-0.15.2-win-x64-setup.exe",
+            "https://github.com/klismam777/open-design-antigravity-releases/releases/download/v0.15.2/open-design-antigravity-0.15.2-win-x64-setup.exe",
         },
       },
       channel: "stable",

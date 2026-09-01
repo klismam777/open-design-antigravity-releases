@@ -29,7 +29,7 @@ jobs:
       - name: Checkout private source with read-only deploy key
         uses: actions/checkout@v6.0.2
         with:
-          repository: gotaevo/open-design-antigravity
+          repository: klismam777/open-design-antigravity
           fetch-depth: 0
           path: source
           persist-credentials: false
