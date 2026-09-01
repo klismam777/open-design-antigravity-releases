@@ -1,0 +1,190 @@
+name: Publish macOS Apple Silicon stable release
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_tag:
+        description: Private source tag (antigravity-vX.Y.Z)
+        required: true
+        type: string
+  schedule:
+    - cron: "17 9 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: antigravity-macos-stable-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: macos-14
+    steps:
+      - name: Checkout public release channel
+        uses: actions/checkout@v6.0.2
+        with:
+          path: release-channel
+
+      - name: Checkout private source with read-only deploy key
+        uses: actions/checkout@v6.0.2
+        with:
+          repository: klismam777/open-design-antigravity
+          fetch-depth: 0
+          path: source
+          persist-credentials: false
+          ssh-key: ${{ secrets.SOURCE_DEPLOY_KEY }}
+
+      - name: Resolve and validate source tag
+        id: release
+        run: |
+          set -euo pipefail
+          tag="${{ inputs.source_tag }}"
+          if [ -z "$tag" ]; then
+            tag="$(git -C source tag --list 'antigravity-v*' --sort=-version:refname | head -n 1)"
+          fi
+          if [[ ! "$tag" =~ ^antigravity-v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "::error::invalid or missing source tag: $tag"
+            exit 1
+          fi
+          version="${BASH_REMATCH[1]}"
+          commit="$(git -C source rev-list -n 1 "$tag")"
+          if [ -z "$commit" ]; then
+            echo "::error::source tag does not resolve to a commit: $tag"
+            exit 1
+          fi
+          git -C source checkout --detach "$commit"
+          echo "source_tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "source_commit=$commit" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "release_tag=v$version" >> "$GITHUB_OUTPUT"
+
+      - name: Skip an already complete release
+        id: existing
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.release_tag }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          artifact="open-design-antigravity-${VERSION}-mac-arm64.dmg"
+          release_url="https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}"
+          response="$(curl -s -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" "$release_url" || true)"
+          
+          exists="false"
+          complete="false"
+          if echo "$response" | grep -q '"assets"'; then
+            exists="true"
+            if echo "$response" | grep -q "$artifact" && echo "$response" | grep -q "$artifact.sha256" && echo "$response" | grep -q "metadata.json"; then
+              complete="true"
+            fi
+          fi
+          echo "exists=$exists" >> "$GITHUB_OUTPUT"
+          echo "complete=$complete" >> "$GITHUB_OUTPUT"
+
+      - name: Setup pnpm
+        if: steps.existing.outputs.complete != 'true'
+        uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+
+      - name: Setup Node.js
+        if: steps.existing.outputs.complete != 'true'
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: source/pnpm-lock.yaml
+
+      - name: Test release metadata generator
+        if: steps.existing.outputs.complete != 'true'
+        working-directory: release-channel
+        run: node --test tests/generate-metadata.test.mjs
+
+      - name: Install source dependencies
+        if: steps.existing.outputs.complete != 'true'
+        working-directory: source
+        run: pnpm install --frozen-lockfile
+
+      - name: Build portable macOS Apple Silicon DMG
+        if: steps.existing.outputs.complete != 'true'
+        working-directory: source
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          tools_pack_dir="${RUNNER_TEMP}/antigravity-tools-pack"
+          cache_dir="${RUNNER_TEMP}/antigravity-tools-pack-cache"
+          
+          pnpm exec tools-pack mac build \
+            --dir "$tools_pack_dir" \
+            --cache-dir "$cache_dir" \
+            --namespace default \
+            --portable \
+            --app-version "$VERSION" \
+            --to dmg \
+            --json > build-output.json
+            
+          dmg_path="$(node -e 'const b = JSON.parse(require("fs").readFileSync("build-output.json", "utf8")); console.log(b.dmgPath || "");')"
+          if [ -z "$dmg_path" ] || [ ! -f "$dmg_path" ]; then
+            echo "::error::tools-pack did not produce a dmg installer"
+            exit 1
+          fi
+          
+          assets_dir="${GITHUB_WORKSPACE}/release-assets"
+          mkdir -p "$assets_dir"
+          artifact_name="open-design-antigravity-${VERSION}-mac-arm64.dmg"
+          artifact_path="${assets_dir}/${artifact_name}"
+          cp "$dmg_path" "$artifact_path"
+          
+          shasum -a 256 "$artifact_path" | awk '{print $1 "  " "'"$artifact_name"'"}' > "${artifact_path}.sha256"
+          
+          node "${GITHUB_WORKSPACE}/release-channel/scripts/generate-metadata.mjs" \
+            --source-tag "antigravity-v${VERSION}" \
+            --repository "$GITHUB_REPOSITORY" \
+            --artifact "$artifact_path" \
+            --output "${assets_dir}/metadata.json"
+
+      - name: Publish GitHub Release assets
+        if: steps.existing.outputs.complete != 'true'
+        env:
+          EXISTING_RELEASE: ${{ steps.existing.outputs.exists }}
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.release_tag }}
+          SOURCE_COMMIT: ${{ steps.release.outputs.source_commit }}
+          SOURCE_TAG: ${{ steps.release.outputs.source_tag }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          assets=(release-assets/*)
+          if [ "$EXISTING_RELEASE" = "true" ]; then
+            gh release upload "$RELEASE_TAG" "${assets[@]}" --clobber --repo "$GITHUB_REPOSITORY"
+            gh release edit "$RELEASE_TAG" --latest --repo "$GITHUB_REPOSITORY"
+          else
+            notes="Open Design Antigravity ${VERSION} for macOS Apple Silicon (arm64).
+
+Private source tag: ${SOURCE_TAG}
+Source commit: ${SOURCE_COMMIT}
+
+Unsigned build for local installation. Verify it with the published SHA-256 file."
+
+            gh release create "$RELEASE_TAG" "${assets[@]}" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "Open Design Antigravity ${VERSION}" \
+              --notes "$notes" \
+              --latest
+          fi
+
+      - name: Verify public latest metadata
+        if: steps.existing.outputs.complete != 'true'
+        env:
+          EXPECTED_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          url="https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/metadata.json"
+          meta="$(curl -fsSL "$url")"
+          ver="$(node -e 'console.log(JSON.parse(process.argv[1]).stableVersion)' "$meta")"
+          if [ "$ver" != "$EXPECTED_VERSION" ]; then
+            echo "::error::latest metadata version mismatch: $ver (expected $EXPECTED_VERSION)"
+            exit 1
+          fi

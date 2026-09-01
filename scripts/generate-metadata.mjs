@@ -17,6 +17,7 @@ export function createStableMetadata({
   artifactName,
   artifactSize,
   generatedAt = new Date().toISOString(),
+  platform = artifactName?.endsWith(".dmg") || artifactName?.endsWith(".zip") ? "mac" : "win",
   repository,
   sourceTag,
 }) {
@@ -35,31 +36,58 @@ export function createStableMetadata({
   const releaseBaseUrl = `https://github.com/${repository}/releases/download/${releaseTag}`;
   const artifactUrl = `${releaseBaseUrl}/${encodeURIComponent(artifactName)}`;
 
+  const platforms = {};
+  if (platform === "mac" || artifactName.endsWith(".dmg") || artifactName.endsWith(".zip")) {
+    const isDmg = artifactName.endsWith(".dmg");
+    const contentType = isDmg ? "application/x-apple-diskimage" : "application/zip";
+    const artifactEntry = {
+      contentType,
+      name: artifactName,
+      sha256Url: `${artifactUrl}.sha256`,
+      size: artifactSize,
+      url: artifactUrl,
+    };
+    platforms.mac = {
+      arch: "arm64",
+      artifacts: {
+        dmg: artifactEntry,
+        installer: artifactEntry,
+      },
+      channel: "stable",
+      enabled: true,
+      feed: null,
+      label: "macOS Apple Silicon",
+      platform: "mac",
+      platformKey: "mac",
+      signed: false,
+    };
+  } else {
+    platforms.win = {
+      arch: "x64",
+      artifacts: {
+        installer: {
+          contentType: "application/vnd.microsoft.portable-executable",
+          name: artifactName,
+          sha256Url: `${artifactUrl}.sha256`,
+          size: artifactSize,
+          url: artifactUrl,
+        },
+      },
+      channel: "stable",
+      enabled: true,
+      feed: null,
+      label: "Windows x64",
+      platform: "win",
+      platformKey: "win",
+      signed: false,
+    };
+  }
+
   return {
     baseVersion: releaseVersion,
     channel: "stable",
     generatedAt,
-    platforms: {
-      win: {
-        arch: "x64",
-        artifacts: {
-          installer: {
-            contentType: "application/vnd.microsoft.portable-executable",
-            name: artifactName,
-            sha256Url: `${artifactUrl}.sha256`,
-            size: artifactSize,
-            url: artifactUrl,
-          },
-        },
-        channel: "stable",
-        enabled: true,
-        feed: null,
-        label: "Windows x64",
-        platform: "win",
-        platformKey: "win",
-        signed: false,
-      },
-    },
+    platforms,
     releaseVersion,
     stableVersion: releaseVersion,
     version: 1,

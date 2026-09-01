@@ -20,9 +20,19 @@ describe("Windows release workflow", () => {
       workflow,
       /gh release edit \$env:RELEASE_TAG --latest --repo \$env:GITHUB_REPOSITORY/,
     );
-    assert.match(
-      workflow,
-      /gh release create \$env:RELEASE_TAG \$assets `[\s\S]*?--repo \$env:GITHUB_REPOSITORY/,
-    );
   });
 });
+
+const macWorkflow = readFileSync(new URL("../.github/workflows/publish-mac.yml", import.meta.url), "utf8");
+
+describe("macOS Apple Silicon release workflow", () => {
+  it("targets the public repository with gh release and portable dmg build", () => {
+    assert.match(macWorkflow, /gh release upload "\$RELEASE_TAG" "\$\{assets\[@\]\}" --clobber --repo "\$GITHUB_REPOSITORY"/);
+    assert.match(macWorkflow, /gh release edit "\$RELEASE_TAG" --latest --repo "\$GITHUB_REPOSITORY"/);
+    assert.match(macWorkflow, /gh release create "\$RELEASE_TAG" "\$\{assets\[@\]\}"/);
+    assert.match(macWorkflow, /tools-pack mac build/);
+    assert.match(macWorkflow, /--to dmg/);
+  });
+});
+
+

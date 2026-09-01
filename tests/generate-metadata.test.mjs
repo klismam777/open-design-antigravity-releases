@@ -42,6 +42,52 @@ describe("fork updater metadata", () => {
     });
   });
 
+  it("describes the public macOS Apple Silicon DMG for a private source tag", () => {
+    const metadata = createStableMetadata({
+      artifactName: "open-design-antigravity-0.15.2-mac-arm64.dmg",
+      artifactSize: 250_000_000,
+      generatedAt: "2026-07-16T20:00:00.000Z",
+      repository: "klismam777/open-design-antigravity-releases",
+      sourceTag: "antigravity-v0.15.2",
+    });
+
+    assert.equal(metadata.version, 1);
+    assert.equal(metadata.channel, "stable");
+    assert.equal(metadata.baseVersion, "0.15.2");
+    assert.equal(metadata.releaseVersion, "0.15.2");
+    assert.equal(metadata.stableVersion, "0.15.2");
+    assert.deepEqual(metadata.platforms.mac, {
+      arch: "arm64",
+      artifacts: {
+        dmg: {
+          contentType: "application/x-apple-diskimage",
+          name: "open-design-antigravity-0.15.2-mac-arm64.dmg",
+          sha256Url:
+            "https://github.com/klismam777/open-design-antigravity-releases/releases/download/v0.15.2/open-design-antigravity-0.15.2-mac-arm64.dmg.sha256",
+          size: 250_000_000,
+          url:
+            "https://github.com/klismam777/open-design-antigravity-releases/releases/download/v0.15.2/open-design-antigravity-0.15.2-mac-arm64.dmg",
+        },
+        installer: {
+          contentType: "application/x-apple-diskimage",
+          name: "open-design-antigravity-0.15.2-mac-arm64.dmg",
+          sha256Url:
+            "https://github.com/klismam777/open-design-antigravity-releases/releases/download/v0.15.2/open-design-antigravity-0.15.2-mac-arm64.dmg.sha256",
+          size: 250_000_000,
+          url:
+            "https://github.com/klismam777/open-design-antigravity-releases/releases/download/v0.15.2/open-design-antigravity-0.15.2-mac-arm64.dmg",
+        },
+      },
+      channel: "stable",
+      enabled: true,
+      feed: null,
+      label: "macOS Apple Silicon",
+      platform: "mac",
+      platformKey: "mac",
+      signed: false,
+    });
+  });
+
   it("rejects source tags outside the Antigravity release namespace", () => {
     assert.throws(() => versionFromSourceTag("v0.15.2"), /invalid source tag/);
     assert.throws(() => versionFromSourceTag("antigravity-v0.15.2-beta.1"), /invalid source tag/);
